@@ -1,6 +1,6 @@
 // Draw four triangles on a red background
 #include <GL/glew.h>
-#include <GL/glfw.h>
+#include <GLFW/glfw3.h>
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
@@ -17,16 +17,18 @@ GLuint load_and_compile_shader(const char *fname, GLenum shaderType);
 GLuint create_program(const char *path_vert_shader, const char *path_frag_shader);
 
 // Called when the window is resized
-void GLFWCALL window_resized(int width, int height);
+void window_resized(GLFWwindow *window, int width, int height);
 
 // Called for keyboard events
-void keyboard(int key, int action);
+void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods);
 
 // Render scene
-void display(GLuint &vao);
+void display(GLFWwindow *window, GLuint &vao);
 
 // Initialize the data to be rendered
 void initialize(GLuint &vao);
+
+void error_callback(int code, const char* description);
 
 int main () {
 	// Initialize GLFW
@@ -35,33 +37,41 @@ int main () {
 		exit(-1);
 	}
 
+	glfwSetErrorCallback(error_callback);
+
 	// Use OpenGL 3.2 core profile
-	glfwOpenWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwOpenWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	glfwOpenWindowHint(GLFW_OPENGL_VERSION_MAJOR, 3);
-	glfwOpenWindowHint(GLFW_OPENGL_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 
 	// Open a window and attach an OpenGL rendering context to the window surface
-	if( !glfwOpenWindow(500, 500, 8, 8, 8, 0, 0, 0, GLFW_WINDOW)) {
+	GLFWwindow *window = glfwCreateWindow(500, 500, "OpenGL 101", NULL, NULL);
+	if(!window) {
 		std::cerr << "Failed to open a window! I'm out!" << std::endl;
 		glfwTerminate();
 		exit(-1);
 	}
+	// Set the window context current
+	glfwMakeContextCurrent(window);
 
 	// Register a callback function for window resize events
-	glfwSetWindowSizeCallback( window_resized );
+	glfwSetWindowSizeCallback(window, window_resized );
 
 	// Register a callback function for keyboard pressed events
-	glfwSetKeyCallback(keyboard);	
+	glfwSetKeyCallback(window, keyboard);
 
 	// Print the OpenGL version
 	int major, minor, rev;
-	glfwGetGLVersion(&major, &minor, &rev);
+	major = glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MAJOR);
+	minor = glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MINOR);
+	rev = glfwGetWindowAttrib(window, GLFW_CONTEXT_REVISION);
 	std::cout << "OpenGL - " << major << "." << minor << "." << rev << std::endl;
 
 	// Initialize GLEW
-	glewExperimental = GL_TRUE;
-	if(glewInit() != GLEW_OK) {
+	/* glewExperimental = GL_TRUE; */
+	GLenum err = glewInit();
+	if(err != GLEW_OK) {
 		std::cerr << "Failed to initialize GLEW! I'm out!" << std::endl;
 		glfwTerminate();
 		exit(-1);
@@ -74,16 +84,16 @@ int main () {
 	initialize(vao);
 
 	// Create a rendering loop
-	int running = GL_TRUE;
+	int should_close = GL_FALSE;
 
-	while(running) {
+	while(!should_close) {
 		// Display scene
-		display(vao);
+		display(window, vao);
 
 		// Pool for events
 		glfwPollEvents();
 		// Check if the window was closed
-		running = glfwGetWindowParam(GLFW_OPENED);
+		should_close = glfwWindowShouldClose(window);
 	}
 
 	// Terminate GLFW
@@ -93,14 +103,14 @@ int main () {
 }
 
 // Render scene
-void display(GLuint &vao) {
+void display(GLFWwindow *window, GLuint &vao) {
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	glBindVertexArray(vao);
 	glDrawArrays(GL_TRIANGLES, 0, 12);
 
 	// Swap front and back buffers
-	glfwSwapBuffers();
+	glfwSwapBuffers(window);
 }
 
 void initialize(GLuint &vao) {
@@ -148,7 +158,7 @@ void initialize(GLuint &vao) {
 }
 
 // Called when the window is resized
-void GLFWCALL window_resized(int width, int height) {
+void window_resized(GLFWwindow *window, int width, int height) {
 	// Use red to clear the screen
 	glClearColor(1, 0, 0, 1);
 
@@ -156,11 +166,11 @@ void GLFWCALL window_resized(int width, int height) {
 	glViewport(0, 0, width, height);
 
 	glClear(GL_COLOR_BUFFER_BIT);
-	glfwSwapBuffers();
+	glfwSwapBuffers(window);
 }
 
 // Called for keyboard events
-void keyboard(int key, int action) {
+void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	if(key == 'Q' && action == GLFW_PRESS) {
 		glfwTerminate();
 		exit(0);
@@ -241,3 +251,7 @@ GLuint create_program(const char *path_vert_shader, const char *path_frag_shader
 	return shaderProgram;
 }
 
+
+void error_callback(int code, const char* description) {
+	std::cerr << "Error occurred: " << description << "(" << code << ")" << std::endl;
+}
